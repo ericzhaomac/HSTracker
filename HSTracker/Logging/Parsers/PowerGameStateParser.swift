@@ -14,7 +14,7 @@ import RegexUtil
 class PowerGameStateParser: LogEventParser {
 
     let BlockStartRegex = RegexPattern(stringLiteral: ".*BLOCK_START.*BlockType=(POWER|TRIGGER)"
-        + ".*id=(\\d*).*(cardId=(\\w*)).*Target=(.+).*SubOption=(.+)")
+        + ".*id=(\\d*).*(cardId=(\\w*)).*player=(\\d*).*Target=(.+).*SubOption=(.+)")
     let CardIdRegex: RegexPattern = "cardId=(\\w+)"
     let CreationRegex: RegexPattern = "FULL_ENTITY - Updating.*id=(\\d+).*zone=(\\w+).*CardID=(\\w*)"
     let CreationTagRegex: RegexPattern = "tag=(\\w+) value=(\\w+)"
@@ -302,7 +302,7 @@ class PowerGameStateParser: LogEventParser {
                     if entity.info.originalEntityWasCreated == nil {
                         entity.info.originalEntityWasCreated = entity.info.created
                     }
-                    if entity.tags[.transformed_from_card] == 46706 {
+                    if entity[.transformed_from_card] == 46706 {
                         eventHandler.chameleosReveal = (entityId, cardId)
                     }
                 }
@@ -354,13 +354,18 @@ class PowerGameStateParser: LogEventParser {
             
             var type: String?
             var cardId: String?
+            var correspondPlayer: Int?
             let matches = logLine.line.matches(BlockStartRegex)
             if matches.count > 0 {
                 type = matches[0].value
             }
             
-            if matches.count > 2 {
-                cardId = matches[2].value
+            if matches.count > 3 {
+                cardId = matches[3].value
+            }
+            
+            if matches.count > 4 {
+                correspondPlayer = Int(matches[4].value)!
             }
             
             blockStart(type: type, cardId: cardId)
@@ -382,6 +387,13 @@ class PowerGameStateParser: LogEventParser {
 
                 if actionStartingCardId.isBlank {
                     return
+                }
+                
+                if type == "TRIGGER" && actionStartingCardId == CardIds.Collectible.Neutral.AugmentedElekk {
+                    if currentBlock?.parent != nil {
+                        actionStartingCardId = currentBlock?.parent?.cardId
+                        type = currentBlock?.parent?.type
+                    }
                 }
 
                 if type == "TRIGGER" {
@@ -433,10 +445,19 @@ class PowerGameStateParser: LogEventParser {
                         case CardIds.Collectible.Neutral.SparkDrill:
                             addKnownCardId(eventHandler: eventHandler,
                                            cardId: CardIds.NonCollectible.Neutral.SparkDrill_SparkToken, count: 2)
+                        case CardIds.Collectible.Warrior.Wrenchcalibur:
+                            addKnownCardId(eventHandler: eventHandler,
+                                           cardId: CardIds.NonCollectible.Neutral.SeaforiumBomber_BombToken)
+                        case CardIds.Collectible.Priest.SpiritOfTheDead:
+                            if correspondPlayer == eventHandler.player.id {
+                                addKnownCardId(eventHandler: eventHandler, cardId: eventHandler.player.lastDiedMinionCardId)
+                            } else if correspondPlayer == eventHandler.opponent.id {
+                                addKnownCardId(eventHandler: eventHandler, cardId: eventHandler.opponent.lastDiedMinionCardId)
+                            }
                         default: break
                         }
                     }
-                } else {
+                } else { // type == "POWER"
                     if let actionStartingCardId = actionStartingCardId {
                         switch actionStartingCardId {
                         case CardIds.Collectible.Rogue.GangUp,
@@ -553,6 +574,21 @@ class PowerGameStateParser: LogEventParser {
                         case CardIds.Collectible.Neutral.SeaforiumBomber:
                             addKnownCardId(eventHandler: eventHandler,
                                            cardId: CardIds.NonCollectible.Neutral.SeaforiumBomber_BombToken)
+                        case CardIds.Collectible.Warrior.ClockworkGoblin:
+                            addKnownCardId(eventHandler: eventHandler,
+                                           cardId: CardIds.NonCollectible.Neutral.SeaforiumBomber_BombToken)
+                        case CardIds.Collectible.Paladin.SandwaspQueen:
+                            addKnownCardId(eventHandler: eventHandler,
+                                           cardId: CardIds.NonCollectible.Paladin.SandwaspQueen_SandwaspToken,
+                                           count: 2)
+                        case CardIds.Collectible.Rogue.ShadowOfDeath:
+                            addKnownCardId(eventHandler: eventHandler,
+                                           cardId: CardIds.NonCollectible.Rogue.ShadowofDeath_ShadowToken,
+                                           count: 3)
+                        case CardIds.Collectible.Warlock.Impbalming:
+                            addKnownCardId(eventHandler: eventHandler,
+                                           cardId: CardIds.NonCollectible.Warlock.Impbalming_WorthlessImpToken,
+                                           count: 3)
                         default:
                             if let card = Cards.any(byId: actionStartingCardId) {
                                 if (player != nil && player![.current_player] == 1

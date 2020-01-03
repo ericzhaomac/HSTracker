@@ -11,6 +11,7 @@
 import Foundation
 //import HearthAssets
 import HearthMirror
+import kotlin_hslog
 
 enum HearthstoneLogError: Error {
     case canNotCreateDir,
@@ -27,6 +28,52 @@ struct HearthstoneRunState {
     }
 }
 
+class MacOSConsole: Kotlin_consoleConsole {
+    func debug(message: String) {
+        logger.debug(message)
+    }
+    
+    func error(message: String) {
+        logger.error(message)
+    }
+    
+    func error(throwable: KotlinThrowable) {
+        throwable.printStackTrace()
+    }
+}
+
+class MacOSAnalytics: Kotlin_analyticsAnalytics {
+    func logEvent(name: String, params: [String : Any]) {
+    }
+}
+
+class MacOSPreferences: Kotlin_hsreplay_apiPreferences {
+    func getBoolean(key: String) -> KotlinBoolean? {
+        return KotlinBoolean(value: UserDefaults.standard.bool(forKey: key))
+    }
+    
+    func getString(key: String) -> String? {
+        return UserDefaults.standard.string(forKey: key)
+    }
+    
+    func putBoolean(key: String, value: KotlinBoolean?) {
+        if let v = value {
+            UserDefaults.standard.set(v, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+    
+    func putString(key: String, value: String?) {
+        if let v = value {
+            UserDefaults.standard.set(v, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+    
+}
+
 final class CoreManager: NSObject {
     static let applicationName = "Hearthstone"
 
@@ -37,7 +84,11 @@ final class CoreManager: NSObject {
     let packWatcher = PackWatcher()
     
     let game: Game
+    var cardJson: CardJson!
+    var exposedHsReplay: ExposedHsReplay!
 
+    var hsLog: HSLog!
+    
     var queue = DispatchQueue(label: "net.hearthsim.hstracker.readers", attributes: [])
     
     override init() {
@@ -45,12 +96,45 @@ final class CoreManager: NSObject {
                                                                   isActive: CoreManager.isHearthstoneActive()))
         super.init()
 		logReaderManager = LogReaderManager(logPath: Settings.hearthstonePath, coreManager: self)
-		
-		/*if CoreManager.assetGenerator == nil && Settings.useHearthstoneAssets {
-			let path = Settings.hearthstonePath
-			CoreManager.assetGenerator = try? HearthAssets(path: path)
-			CoreManager.assetGenerator?.locale = (Settings.hearthstoneLanguage ?? .enUS).rawValue
-		}*/
+        
+        let lang: Language.Hearthstone
+        if Settings.hearthstoneLanguage == nil {
+            lang = Language.Hearthstone.enUS
+        } else {
+            lang = Settings.hearthstoneLanguage!
+        }
+        
+        let maybeUrl = Bundle(for: type(of: self))
+            .url(forResource: "Resources/Cards/cardsDB.\(lang)",
+                withExtension: "json")
+        
+        let console = MacOSConsole()
+        if let url = maybeUrl, let fileHandle = try? FileHandle(forReadingFrom: url) {
+            let input = PosixInputKt.Input(fileDescriptor: fileHandle.fileDescriptor)
+            logger.debug("building CardJson...")
+            self.cardJson = CardJson.Companion().fromLocalizedJson(input: input)
+            FreezeHelperKt.freeze(self.cardJson)
+            logger.debug("building HSLog...")
+            hsLog = HSLog(console: console, cardJson: cardJson, debounceDelay: 100)
+            hsLog.setListener(listener: HSTLogListener(windowManager: game.windowManager))
+        }
+        
+        self.exposedHsReplay = ExposedHsReplay(
+            preferences: MacOSPreferences(),
+            console: console,
+            analytics: MacOSAnalytics(),
+            userAgent: Http.userAgent()
+        )
+        
+        if let refreshToken = Settings.hsReplayOAuthRefreshToken, let oauthToken = Settings.hsReplayOAuthToken {
+            exposedHsReplay.setTokens(accessToken: oauthToken, refreshToken: refreshToken)
+        }
+    }
+    
+    func processPower(rawLine: String) {
+        DispatchQueue.main.async {
+            self.hsLog.processPower(rawLine: rawLine, isOldData: false)
+        }
     }
     
     deinit {

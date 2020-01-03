@@ -11,6 +11,7 @@
 import Foundation
 import RealmSwift
 import HearthMirror
+import kotlin_hslog
 
 struct PlayingDeck {
     let id: String
@@ -30,11 +31,7 @@ class Game: NSObject, PowerEventHandler {
 	/**
 	 * View controller of this game object
 	 */
-	#if DEBUG
-		internal let windowManager = WindowManager()
-	#else
-		private let windowManager = WindowManager()
-	#endif
+    internal let windowManager = WindowManager()
 	
 	static let guiUpdateDelay: TimeInterval = 0.5
 	
@@ -110,6 +107,7 @@ class Game: NSObject, PowerEventHandler {
         self.updateBoardStateTrackers()
 		self.updateArenaHelper()
         self.updateSecretTracker()
+        self.updateBattlegroundsOverlay()
 	}
 	
     // MARK: - GUI calls
@@ -131,6 +129,7 @@ class Game: NSObject, PowerEventHandler {
 			
 			let tracker = self.windowManager.opponentTracker
 			if Settings.showOpponentTracker &&
+                AppDelegate.instance().coreManager.hsLog.currentOrFinishedGame()?.gameType != kotlin_hslog.GameType.gtBattlegrounds &&
             !(Settings.dontTrackWhileSpectating && self.spectator) &&
 				((Settings.hideAllTrackersWhenNotInGame && !self.gameEnded)
 					|| (!Settings.hideAllTrackersWhenNotInGame) || self.selfAppActive ) &&
@@ -329,6 +328,20 @@ class Game: NSObject, PowerEventHandler {
                 }
             } else {
                 self.windowManager.show(controller: tracker, show: false)
+            }
+        }
+    }
+    
+    func updateBattlegroundsOverlay() {
+        let rect = SizeHelper.battlegroundsOverlayFrame()
+
+        DispatchQueue.main.async {
+            if (Settings.hideAllWhenGameInBackground && self.hearthstoneRunState.isActive)
+                    || !Settings.hideAllWhenGameInBackground {
+                
+                self.windowManager.show(controller: self.windowManager.battlegroundsOverlay, show: true, frame: rect, title: nil, overlay: true)
+            } else {
+                self.windowManager.show(controller: self.windowManager.battlegroundsOverlay, show: false)
             }
         }
     }
@@ -787,7 +800,11 @@ class Game: NSObject, PowerEventHandler {
             return
         }
         
-        guard let playerEntity = player.entity, let _ = playerEntity.tags[GameTag.whizbang_deck_id] else {
+        guard let playerEntity = player.entity else {
+            return
+        }
+        
+        if playerEntity[.whizbang_deck_id] == 0 {
             // player is not using a whizbang deck
             return
         }
@@ -1210,6 +1227,7 @@ class Game: NSObject, PowerEventHandler {
 
         if player == .player {
             handleThaurissanCostReduction()
+            secretsManager?.handleTurnStart()
         }
 
         if turnQueue.count > 0 {
@@ -1431,8 +1449,18 @@ class Game: NSObject, PowerEventHandler {
         updateTrackers()
     }
 
-    func playerPlayToGraveyard(entity: Entity, cardId: String?, turn: Int) {
+    func playerPlayToGraveyard(entity: Entity, cardId: String?, turn: Int, playersTurn: Bool) {
         player.playToGraveyard(entity: entity, cardId: cardId, turn: turn)
+        if playersTurn && entity.isMinion {
+            playerMinionDeath(entity: entity)
+        }
+        
+        // a workaround to fix (#1080) by double-checking the secrets after a spell takes effect,
+        // e.g., summoned a minion.
+        if playersTurn && entity.isSpell {
+            secretsManager?.handleCardPlayed(entity: entity)
+        }
+        
         updateTrackers()
     }
 
@@ -1707,12 +1735,16 @@ class Game: NSObject, PowerEventHandler {
         }
     }
 
-    func playerMinionPlayed() {
-        secretsManager?.handleMinionPlayed()
+    func playerMinionPlayed(entity: Entity) {
+        secretsManager?.handleMinionPlayed(entity: entity)
+    }
+    
+    func playerMinionDeath(entity: Entity) {
+        secretsManager?.handlePlayerMinionDeath(entity: entity)
     }
 
     func opponentMinionDeath(entity: Entity, turn: Int) {
-        secretsManager?.handleMinionDeath(entity: entity)
+        secretsManager?.handleOpponentMinionDeath(entity: entity)
     }
 
     func opponentDamage(entity: Entity) {

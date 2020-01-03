@@ -125,6 +125,8 @@ extension CardIds.Collectible {
         static let LightfusedStegodon: String = "UNG_962"
         static let HiddenWisdom: String = "GIL_903"
         static let AutodefenseMatrix: String = "BOT_908"
+        static let NeverSurrender = "DAL_570"
+        static let SandwaspQueen = "ULD_439"
     }
 }
 
@@ -185,13 +187,14 @@ extension CardIds.NonCollectible {
         static let BolvarFireblood_FadingLightEnchantment: String = "ICC_858e"
         static let TirionFordring: String = "ICCA01_013"
         static let HandOfSalvation: String = "BCON_012"
+        static let SandwaspQueen_SandwaspToken: String = "ULD_439t"
     }
 }
 
 extension CardIds.Secrets {
     struct Paladin {
         static let All = [AutodefenseMatrix, Avenge, CompetitiveSpirit, EyeForAnEye, HiddenWisdom, NobleSacrifice,
-                          HandOfSalvation, GetawayKodo, Redemption, Repentance, SacredTrial]
+                          HandOfSalvation, GetawayKodo, Redemption, Repentance, SacredTrial, NeverSurrender]
         static let AutodefenseMatrix = CardIds.Collectible.Paladin.AutodefenseMatrix
         static let Avenge = CardIds.Collectible.Paladin.Avenge
         static let CompetitiveSpirit = CardIds.Collectible.Paladin.CompetitiveSpirit
@@ -203,5 +206,6 @@ extension CardIds.Secrets {
         static let SacredTrial = CardIds.Collectible.Paladin.SacredTrial
         static let HandOfSalvation = CardIds.NonCollectible.Paladin.HandOfSalvation
         static let HiddenWisdom = CardIds.Collectible.Paladin.HiddenWisdom
+        static let NeverSurrender = CardIds.Collectible.Paladin.NeverSurrender
     }
 }

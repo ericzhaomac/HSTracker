@@ -44,7 +44,7 @@ extension DynamicEntity: Hashable {
     static func == (lhs: DynamicEntity, rhs: DynamicEntity) -> Bool {
         return lhs.cardId == rhs.cardId &&
             lhs.hidden == rhs.hidden &&
-            lhs.created == lhs.created &&
+            lhs.created == rhs.created &&
             lhs.discarded == rhs.discarded &&
             lhs.cardMark == rhs.cardMark &&
             lhs.stolen == rhs.stolen &&
@@ -90,6 +90,7 @@ final class Player {
     var goingFirst = false
     var fatigue = 0
     var heroPowerCount = 0
+    var lastDiedMinionCardId: String?
     fileprivate(set) var spellsPlayedCount = 0
     fileprivate(set) var deathrattlesPlayedCount = 0
 	private unowned(unsafe) let game: Game
@@ -129,7 +130,7 @@ final class Player {
     var quests: [Entity] { return playerEntities.filter({ $0.isInSecret && $0.isQuest }) }
     var setAside: [Entity] { return playerEntities.filter({ $0.isInSetAside }) }
     var entity: Entity? {
-        return game.entities.map({ $0.1 }).filter({ $0.tags[GameTag.player_id] == self.id }).first
+        return game.entities.map({ $0.1 }).filter({ $0[.player_id] == self.id }).first
     }
 
     fileprivate(set) lazy var inDeckPredictions = [PredictedCard]()
@@ -158,11 +159,11 @@ final class Player {
     }
     
     var currentMana: Int {
-        return self.maxMana - (entity?.tags[GameTag.resources_used] ?? 0)
+        return self.maxMana - (entity?[.resources_used] ?? 0)
     }
     
     var maxMana: Int {
-        return (entity?.tags[GameTag.resources] ?? 0) + (entity?.tags[GameTag.temp_resources] ?? 0)
+        return (entity?[.resources] ?? 0) + (entity?[.temp_resources] ?? 0)
     }
 
     var displayRevealedCards: [Card] {
@@ -574,6 +575,11 @@ final class Player {
         if entity.isMinion && entity.has(tag: .deathrattle) {
             deathrattlesPlayedCount += 1
         }
+        
+        if entity.isMinion {
+            lastDiedMinionCardId = cardId
+        }
+        
         if Settings.fullGameLog {
             logger.info("\(debugName) \(#function) \(entity)")
         }

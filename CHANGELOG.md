@@ -1,3 +1,98 @@
+# 1.6.11
+## Fixes:
+- Improve collection upload (https://github.com/HearthSim/HSTracker/issues/1101)
+- Fixed battlegrounds overlay in windowed mode (https://github.com/HearthSim/HSTracker/issues/1095)
+
+# 1.6.10
+## New:
+- Descent of Dragons!
+
+# 1.6.9
+## New:
+- Battlegrounds support: Hovering an opponent in the sidebar will now display their last known board state.
+- Better collection upload dialog.
+
+# 1.6.8
+## New:
+- Sathrovarr support
+
+# 1.6.6
+## New:
+- Update for Hallow's end
+
+# 1.6.4
+## New:
+- Update for 2019-08-26 nerfs
+- Sign the app with a "Developer ID" certificate (https://github.com/HearthSim/HSTracker/issues/1018 and https://github.com/HearthSim/HSTracker/issues/1078) 
+- Add support for tracking uldmu cards
+
+# 1.6.3
+## New:
+- Added support for Saviors of Uldum
+
+# 1.6.2
+## Fixes:
+- Fixed secret tracker is lagging  (https://github.com/HearthSim/HSTracker/issues/972 and https://github.com/HearthSim/HSTracker/issues/994)
+- Fixed window positioning on MacOS Catalina  (https://github.com/HearthSim/HSTracker/issues/1071)
+
+# 1.6.1
+## New:
+- Added support for Patch 14.6
+## Fixes:
+- Fixed Rat Trap and Hidden Wisdom (https://github.com/HearthSim/HSTracker/issues/1065#event-2449704550)
+
+# 1.6.0
+## Fixes:
+- Fixed rank detection not working since patch 14.4.0.31268 (https://github.com/HearthSim/HSTracker/issues/1063)
+
+# 1.5.9
+## New:
+- Added support for Patch 14.4
+## Fixes:
+- Hopefully fix a random crash happening in 1.5.8 (https://github.com/HearthSim/HSTracker/issues/1054)
+
+# 1.5.8
+## Fixes:
+- Collection will update endlessly (https://github.com/HearthSim/HSTracker/issues/1045)
+
+# 1.5.7
+## Fixes:
+- Crash fixes
+
+# 1.5.6
+## New:
+- Added support for Rise of the shadows
+
+# 1.5.5
+## Fixes:
+- Updated card data for the latest patch
+- Display card art on mouse hover
+- Fixed 'UNKNOWN HUMAN' opponent name
+- Whizbang support
+- Fix rank upload
+
+# 1.5.4
+## Fixes:
+- Updated card data for the latest patch
+- Fixed card overlays for the dark theme in OSX Mojave
+
+# 1.5.3
+## Fixes:
+- Added missing secrets
+
+# 1.5.2a
+## Fixes:
+- Fixed a card loading bug
+
+# 1.5.2
+## New:
+- Added support for the Rastakhan's Rumble expansion
+
+# 1.5.1c
+## Fixes:
+- Fixed hsreplay.net oauth address
+- Fixed a bug that blocked collection upload in certain situations
+
 # 1.5.1
 ## New:
 - Added Collection uploading to HSReplay.net

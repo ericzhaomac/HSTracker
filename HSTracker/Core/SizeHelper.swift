@@ -23,17 +23,22 @@ struct SizeHelper {
             reload()
         }
         
-        func reload() {
+        private func area(dict: NSDictionary) -> Int {
+            let h = (dict["kCGWindowBounds"] as? NSDictionary)?["Height"] as? Int ?? 0
+            let w = (dict["kCGWindowBounds"] as? NSDictionary)?["Height"] as? Int ?? 0
 
+            return w * h
+        }
+        
+        func reload() {
             let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements)
             let windowListInfo = CGWindowListCopyWindowInfo(options, CGWindowID(0))
-            if let info = (windowListInfo as NSArray? as? [[String: AnyObject]])?.filter({
-                !$0.filter({ $0.0 == "kCGWindowName"
-                    && $0.1 as? String == CoreManager.applicationName }).isEmpty
-            }).filter({
-                !$0.filter({ $0.0 == "kCGWindowOwnerName"
-                    && $0.1 as? String == CoreManager.applicationName }).isEmpty
-            }).first {
+
+            if let info = (windowListInfo as? [NSDictionary])?.filter({dict in
+                dict["kCGWindowOwnerName"] as? String == CoreManager.applicationName
+            }).sorted(by: {
+                return area(dict: $1) > area(dict: $0)
+            }).last {
                 if let id = info["kCGWindowNumber"] as? Int {
                     self.windowId = CGWindowID(id)
                 }
@@ -42,7 +47,7 @@ struct SizeHelper {
                 // swiftlint:enable force_cast
                 if let rect = CGRect(dictionaryRepresentation: bounds) {
                     var frame = rect
-
+                    
                     // Warning: this function assumes that the
                     // first screen in the list is the active one
                     if let screen = NSScreen.screens.first {
@@ -266,6 +271,36 @@ struct SizeHelper {
 
     static func timerHudFrame() -> NSRect {
         let frame = NSRect(x: 999.0, y: 423.0, width: 160.0, height: 115.0)
+        return hearthstoneWindow.relativeFrame(frame)
+    }
+    
+    static func battlegroundsOverlayFrame() -> NSRect {
+        let top = hearthstoneWindow.frame.minY + 0.85 * hearthstoneWindow.height
+        let bottom = hearthstoneWindow.frame.minY + 0.15 * hearthstoneWindow.height
+                 
+        // Looks like the HS board ratio is 1.5, the rest is padding
+        let boardWidth = hearthstoneWindow.height * 1.5
+        let left = hearthstoneWindow.frame.minX + 0.05 * boardWidth + (hearthstoneWindow.width - boardWidth)/2
+        let right = hearthstoneWindow.frame.minX + 0.125 * boardWidth + (hearthstoneWindow.width - boardWidth)/2
+                 
+        let frame = NSRect(x: left, y: bottom, width: right - left, height: top - bottom)
+        return (frame)
+    }
+
+    static func battlegroundsDetailsFrame() -> NSRect {
+        let w: CGFloat = BaseWidth - 2 * (trackerWidth + 20)
+        let h: CGFloat = 120
+        
+        let frame = NSRect(x: trackerWidth + 20, y: BaseHeight - h, width: w, height: h)
+        return hearthstoneWindow.relativeFrame(frame)
+    }
+
+    static func collectionFeedbackFrame() -> NSRect {
+        let w: CGFloat = 450.0
+        let h: CGFloat = 80.0
+        let offset: CGFloat = 20.0
+        
+        let frame = NSRect(x: (BaseWidth - w)/2, y: (BaseHeight - offset - h), width: w, height: h)
         return hearthstoneWindow.relativeFrame(frame)
     }
 

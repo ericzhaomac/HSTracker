@@ -17,6 +17,9 @@ class SecretsManager {
 
     private var game: Game
     private(set) var secrets: [Secret] = []
+    
+    private var _lastPlayedMinionId: Int = 0
+    private var savedSecrets: [String] = []
 
     var onChanged: (([Card]) -> Void)?
 
@@ -30,6 +33,14 @@ class SecretsManager {
 
     private var hasActiveSecrets: Bool {
         return secrets.count > 0
+    }
+    
+    private func saveSecret(secretName: String) {
+        if !secrets.any({ (s) -> Bool in
+            s.isExcluded(cardId: secretName)
+        }) {
+            savedSecrets.append(secretName)
+        }
     }
 
     func exclude(cardId: String, invokeCallback: Bool = true) {
@@ -90,6 +101,7 @@ class SecretsManager {
         secrets.remove(secret)
         if secret.entity.hasCardId {
             exclude(cardId: secret.entity.cardId, invokeCallback: false)
+            savedSecrets.remove(secret.entity.cardId)
         }
         onChanged?(getSecretList())
         return true
@@ -144,7 +156,7 @@ class SecretsManager {
             cards = cards.filter { !CardIds.Secrets.arenaOnly.contains($0.id) }
         }
 
-        return cards.filter { $0.count > 0 }
+        return cards.filter { $0.count > 0 }.sortCardList()
     }
 
     func handleAttack(attacker: Entity, defender: Entity, fastOnly: Bool = false) {
@@ -162,7 +174,8 @@ class SecretsManager {
 
         if defender.isHero {
             if !fastOnly {
-                if freeSpaceOnBoard {
+                // if the minion dies, bear trap won't be triggered
+                if freeSpaceOnBoard && attacker.health >= 1 {
                     exclude.append(CardIds.Secrets.Hunter.BearTrap)
                 }
                 exclude.append(CardIds.Secrets.Mage.IceBarrier)
@@ -177,14 +190,17 @@ class SecretsManager {
             if game.isMinionInPlay {
                 exclude.append(CardIds.Secrets.Hunter.Misdirection)
             }
-            
+
             if attacker.isMinion && game.playerMinionCount > 1 {
                 exclude.append(CardIds.Secrets.Rogue.SuddenBetrayal)
             }
 
             if attacker.isMinion {
                 exclude.append(CardIds.Secrets.Mage.Vaporize)
-                exclude.append(CardIds.Secrets.Hunter.FreezingTrap)
+                exclude.append(CardIds.Secrets.Mage.FlameWard)
+                if attacker.health >= 1 {
+                    exclude.append(CardIds.Secrets.Hunter.FreezingTrap)
+                }
             }
         } else {
             if !defender.has(tag: .divine_shield) {
@@ -222,20 +238,27 @@ class SecretsManager {
         }
     }
 
-    func handleMinionPlayed() {
+    func handleMinionPlayed(entity: Entity) {
         guard handleAction else { return }
 
         var exclude: [String] = []
+        
+        _lastPlayedMinionId = entity.id
 
         //Hidden cache will only trigger if the opponent has a minion in hand.
         //We might not know this for certain - requires additional tracking logic.
         //TODO: _game.SecretsManager.SetZero(Hunter.HiddenCache);
+        saveSecret(secretName: CardIds.Secrets.Hunter.Snipe)
         exclude.append(CardIds.Secrets.Hunter.Snipe)
+        saveSecret(secretName: CardIds.Secrets.Mage.ExplosiveRunes)
         exclude.append(CardIds.Secrets.Mage.ExplosiveRunes)
+        saveSecret(secretName: CardIds.Secrets.Mage.PotionOfPolymorph)
         exclude.append(CardIds.Secrets.Mage.PotionOfPolymorph)
+        saveSecret(secretName: CardIds.Secrets.Paladin.Repentance)
         exclude.append(CardIds.Secrets.Paladin.Repentance)
 
         if freeSpaceOnBoard {
+            saveSecret(secretName: CardIds.Secrets.Mage.MirrorEntity)
             exclude.append(CardIds.Secrets.Mage.MirrorEntity)
         }
 
@@ -246,7 +269,7 @@ class SecretsManager {
         self.exclude(cardIds: exclude)
     }
 
-    func handleMinionDeath(entity: Entity) {
+    func handleOpponentMinionDeath(entity: Entity) {
         guard handleAction else { return }
 
         var exclude: [String] = []
@@ -256,7 +279,7 @@ class SecretsManager {
             exclude.append(CardIds.Secrets.Rogue.CheatDeath)
         }
         
-        if let opponent_minions_died = game.opponentEntity?.tags[.num_friendly_minions_that_died_this_turn], opponent_minions_died >= 1 {
+        if let opponent_minions_died = game.opponentEntity?[.num_friendly_minions_that_died_this_turn], opponent_minions_died >= 1 {
             exclude.append(CardIds.Secrets.Paladin.HandOfSalvation)
         }
 
@@ -299,29 +322,44 @@ class SecretsManager {
 
         self.exclude(cardIds: exclude)
     }
+    
+    func handlePlayerMinionDeath(entity: Entity) {
+        if entity.id == _lastPlayedMinionId && savedSecrets.count > 0 {
+            savedSecrets.forEach { savedSecret in
+                secrets.forEach { secret in
+                    secret.include(cardId: savedSecret)
+                }
+            }
+            
+            onChanged?(getSecretList())
+        }
+    }
 
     func handleAvengeAsync(deathRattleCount: Int) {
         guard handleAction else { return }
 
-        _avengeDeathRattleCount += deathRattleCount
         if _awaitingAvenge {
             return
         }
-        _awaitingAvenge = true
-        if game.opponentMinionCount != 0 {
-            do {
-                try await {
-                    Thread.sleep(forTimeInterval: self.avengeDelay)
+        
+        DispatchQueue.global().async {
+            self._awaitingAvenge = true
+            self._avengeDeathRattleCount += deathRattleCount
+            if self.game.opponentMinionCount != 0 {
+                do {
+                    try await {
+                        Thread.sleep(forTimeInterval: self.avengeDelay)
+                    }
+                    if self.game.opponentMinionCount - self._avengeDeathRattleCount > 0 {
+                        self.exclude(cardId: CardIds.Secrets.Paladin.Avenge)
+                    }
+                } catch {
+                    logger.error("\(error)")
                 }
-                if game.opponentMinionCount - _avengeDeathRattleCount > 0 {
-                    exclude(cardId: CardIds.Secrets.Paladin.Avenge)
-                }
-            } catch {
-                logger.error("\(error)")
             }
+            self._avengeDeathRattleCount = 0
+            self._awaitingAvenge = false
         }
-        _awaitingAvenge = false
-        _avengeDeathRattleCount = 0
     }
 
     func handleOpponentDamage(entity: Entity) {
@@ -344,22 +382,28 @@ class SecretsManager {
         _lastCompetitiveSpiritCheck = turn
         exclude(cardId: CardIds.Secrets.Paladin.CompetitiveSpirit)
     }
+    
+    func handleTurnStart() {
+        savedSecrets.removeAll()
+    }
 
     func handleCardPlayed(entity: Entity) {
         guard handleAction else { return }
+        
+        savedSecrets.removeAll()
 
         var exclude: [String] = []
         
         if freeSpaceOnBoard {
-            if let opponent = game.opponentEntity, opponent.has(tag: .num_cards_played_this_turn) &&
-                (opponent[.num_cards_played_this_turn] >= 3) {
+            if let player = game.playerEntity, player.has(tag: .num_cards_played_this_turn) &&
+                (player[.num_cards_played_this_turn] >= 3) {
                     exclude.append(CardIds.Secrets.Hunter.RatTrap)
             }
         }
         
         if freeSpaceInHand {
-            if let opponent = game.opponentEntity, opponent.has(tag: .num_cards_played_this_turn) &&
-                (opponent[.num_cards_played_this_turn] >= 2) {
+            if let player = game.playerEntity, player.has(tag: .num_cards_played_this_turn) &&
+                (player[.num_cards_played_this_turn] >= 3) {
                 exclude.append(CardIds.Secrets.Paladin.HiddenWisdom)
             }
         }
@@ -367,11 +411,18 @@ class SecretsManager {
         if entity.isSpell {
             exclude.append(CardIds.Secrets.Mage.Counterspell)
 
-            if game.opponentHandCount < 10 {
+            if game.opponentMinionCount > 0 {
+                exclude.append(CardIds.Secrets.Paladin.NeverSurrender)
+            }
+            if game.playerMinionCount > 0 {
+                exclude.append(CardIds.Secrets.Hunter.PressurePlate)
+            }
+
+            if freeSpaceInHand {
                 exclude.append(CardIds.Secrets.Mage.ManaBind)
             }
 
-            if game.opponentMinionCount < 7 {
+            if freeSpaceOnBoard {
                 // CARD_TARGET is set after ZONE, wait for 50ms gametime before checking
                 do {
                     try await {

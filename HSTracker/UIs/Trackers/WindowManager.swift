@@ -61,6 +61,18 @@ class WindowManager {
         return $0
     }(TimerHud(windowNibName: NSNib.Name(rawValue: "TimerHud")))
 
+    var collectionFeedBack: CollectionFeedback = {
+        return $0
+    }(CollectionFeedback(windowNibName: NSNib.Name(rawValue: "CollectionFeedback")))
+
+    var battlegroundsOverlay: BattlegroundsOverlay = {
+        return $0
+    }(BattlegroundsOverlay(windowNibName: NSNib.Name(rawValue: "BattlegroundsOverlay")))
+
+    var battlegroundsDetailsWindow: BattlegroundsDetailsWindow = {
+        return $0
+    }(BattlegroundsDetailsWindow(windowNibName: NSNib.Name(rawValue: "BattlegroundsDetailsWindow")))
+
     var floatingCard: FloatingCard = {
         if let fWindow = $0.window {
             

@@ -1,8 +1,13 @@
+/Arcane-Tracker
+/.buildmetrics
 .DS_Store
 .env
 
 # Downloaded cards
 HSTracker/Resources/Cards/*.json
+
+# Place where we store archives
+/archive
 
 fastlane/*
 !fastlane/Fastfile
@@ -42,3 +47,9 @@ xcuserdata/
 
 # AppCode
 .idea
+
+# Archived builds
+archives
+
+# Appcast private key
+dsa_priv.pem
